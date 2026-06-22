@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>百八拜</title>
+
+  <!-- PWA 메타 -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="百八拜" />
+  <meta name="theme-color" content="#1A1A18" />
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- 아이콘 (SVG 인라인 Data URL) -->
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="icon" href="icon.png" />
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body, #root { height: 100%; background: #1A1A18; }
+    @keyframes rippleOut {
+      from { transform: scale(1); opacity: 1; }
+      to { transform: scale(1.4); opacity: 0; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    input[type=range] { accent-color: #8FA89A; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React + Babel (CDN) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const TOTAL = 108;
+const formatTime = (s) => `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+const toKey = (d) => { const x = d instanceof Date ? d : new Date(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`; };
+const todayKey = () => toKey(new Date());
+const loadHistory = () => { try { const r = localStorage.getItem("bae108_v2"); return r ? JSON.parse(r) : {}; } catch { return {}; } };
+const saveHistory = (h) => { try { localStorage.setItem("bae108_v2", JSON.stringify(h)); } catch {} };
+
+const navBtnStyle = { background:"none", border:"none", color:"rgba(242,237,228,0.4)", fontSize:22, cursor:"pointer", padding:"4px 10px", lineHeight:1 };
+
+// ── 달력 ──
+function Calendar({ history }) {
+  const now = new Date();
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth());
+  const [selected, setSelected] = useState(null);
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+  const todayStr = todayKey();
+  const monthNames = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+  const dayNames = ["일","월","화","수","목","금","토"];
+  const prevMonth = () => { if(viewMonth===0){setViewYear(y=>y-1);setViewMonth(11);}else setViewMonth(m=>m-1); setSelected(null); };
+  const nextMonth = () => { if(viewMonth===11){setViewYear(y=>y+1);setViewMonth(0);}else setViewMonth(m=>m+1); setSelected(null); };
+  const monthComplete = Object.entries(history).filter(([k,v])=>k.startsWith(`${viewYear}-${String(viewMonth+1).padStart(2,"0")}`)&&v>0).length;
+  let streak=0; const check=new Date();
+  while(true){const k=toKey(check);if(history[k]&&history[k]>0){streak++;check.setDate(check.getDate()-1);}else break;if(streak>366)break;}
+  const cells=[]; for(let i=0;i<firstDay;i++)cells.push(null); for(let d=1;d<=daysInMonth;d++)cells.push(d);
+  const selectedKey=selected?`${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(selected).padStart(2,"0")}`:null;
+  const selectedSessions=selectedKey?(history[selectedKey]||0):0;
+
+  return (
+    <div style={{width:"100%",maxWidth:320,margin:"0 auto",display:"flex",flexDirection:"column",gap:20}}>
+      <div style={{display:"flex",justifyContent:"space-between",padding:"0 4px"}}>
+        {[{label:"이번 달",value:`${monthComplete}일`},{label:"연속",value:`${streak}일`},{label:"누적",value:`${Object.values(history).reduce((a,b)=>a+b,0)}회`}].map(({label,value})=>(
+          <div key={label} style={{textAlign:"center"}}>
+            <div style={{fontSize:20,color:"#F2EDE4",fontFamily:"'Helvetica Neue',sans-serif",fontWeight:200,letterSpacing:"0.05em"}}>{value}</div>
+            <div style={{fontSize:10,color:"#6B6B60",letterSpacing:"0.25em",fontFamily:"'Helvetica Neue',sans-serif",marginTop:2}}>{label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <button onClick={prevMonth} style={navBtnStyle}>‹</button>
+        <div style={{fontSize:14,color:"#F2EDE4",letterSpacing:"0.2em",fontFamily:"'Helvetica Neue',sans-serif",fontWeight:300}}>{viewYear}년 {monthNames[viewMonth]}</div>
+        <button onClick={nextMonth} disabled={viewYear===now.getFullYear()&&viewMonth===now.getMonth()} style={{...navBtnStyle,opacity:(viewYear===now.getFullYear()&&viewMonth===now.getMonth())?0.2:1}}>›</button>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
+        {dayNames.map((d,i)=>(
+          <div key={d} style={{textAlign:"center",fontSize:10,letterSpacing:"0.1em",color:i===0?"rgba(201,75,58,0.6)":i===6?"rgba(143,168,154,0.6)":"#6B6B60",fontFamily:"'Helvetica Neue',sans-serif",paddingBottom:6}}>{d}</div>
+        ))}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
+        {cells.map((day,i)=>{
+          if(!day) return <div key={`e${i}`}/>;
+          const key=`${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+          const count=history[key]||0;
+          const isToday=key===todayStr;
+          const isSelected=day===selected;
+          const isFuture=new Date(viewYear,viewMonth,day)>new Date(now.getFullYear(),now.getMonth(),now.getDate());
+          const dotCount=Math.min(count,3);
+          return (
+            <div key={day} onClick={()=>!isFuture&&setSelected(isSelected?null:day)} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"6px 2px",borderRadius:4,cursor:isFuture?"default":"pointer",background:isSelected?"rgba(201,75,58,0.15)":count>0?"rgba(143,168,154,0.08)":"none",border:isToday?"1px solid rgba(201,75,58,0.4)":isSelected?"1px solid rgba(201,75,58,0.3)":"1px solid transparent",minHeight:44,gap:4}}>
+              <span style={{fontSize:13,color:isFuture?"rgba(107,107,96,0.25)":count>0?"#F2EDE4":isToday?"#C94B3A":"rgba(242,237,228,0.45)",fontFamily:"'Helvetica Neue',sans-serif",fontWeight:count>0?400:300}}>{day}</span>
+              {count>0&&<div style={{display:"flex",gap:2}}>{Array.from({length:dotCount}).map((_,di)=><div key={di} style={{width:4,height:4,borderRadius:"50%",background:di===0?"#8FA89A":di===1?"rgba(143,168,154,0.6)":"rgba(143,168,154,0.3)"}}/>)}</div>}
+            </div>
+          );
+        })}
+      </div>
+      {selected&&(
+        <div style={{padding:"14px 18px",border:"1px solid rgba(242,237,228,0.08)",borderRadius:4,background:"rgba(242,237,228,0.03)",animation:"fadeIn 0.3s ease",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{fontSize:13,color:"#6B6B60",fontFamily:"'Helvetica Neue',sans-serif",letterSpacing:"0.1em"}}>{viewMonth+1}월 {selected}일</div>
+          <div style={{textAlign:"right"}}>
+            {selectedSessions>0?(<><span style={{fontSize:22,color:"#8FA89A",fontFamily:"'Helvetica Neue',sans-serif",fontWeight:200}}>{selectedSessions}</span><span style={{fontSize:11,color:"#6B6B60",fontFamily:"'Helvetica Neue',sans-serif",marginLeft:4}}>회 완료</span></>):(<span style={{fontSize:12,color:"rgba(107,107,96,0.5)",fontFamily:"'Helvetica Neue',sans-serif",letterSpacing:"0.1em"}}>기록 없음</span>)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── 메인 앱 ──
+function App() {
+  const [tab, setTab] = useState("counter");
+  const [count, setCount] = useState(0);
+  const [phase, setPhase] = useState("idle");
+  const [elapsed, setElapsed] = useState(0);
+  const [history, setHistory] = useState(loadHistory);
+  const [ripple, setRipple] = useState(false);
+  const [milestone, setMilestone] = useState(false);
+  const [intervalSec, setIntervalSec] = useState(5.0);
+  const [bowCountdown, setBowCountdown] = useState(null);
+  const [autoMode, setAutoMode] = useState(false);
+  const [bgmOn, setBgmOn] = useState(false);
+  const [bgmVol, setBgmVol] = useState(0.18);
+  const [readyCount, setReadyCount] = useState(5); // 준비 카운트다운
+  const readyTimerRef = useRef(null);
+
+  const timerRef = useRef(null);
+  const startRef = useRef(null);
+  const bowTimerRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const triggerBowRef = useRef(null);
+  const bgmRef = useRef(null);
+  const bgmVolRef = useRef(0.18);
+
+  const sessions = history[todayKey()] || 0;
+
+  useEffect(() => {
+    if (phase === "active") {
+      startRef.current = Date.now() - elapsed * 1000;
+      timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now()-startRef.current)/1000)), 1000);
+    } else clearInterval(timerRef.current);
+    return () => clearInterval(timerRef.current);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase === "active" && autoMode) {
+      bowTimerRef.current = setInterval(() => {
+        setBowCountdown(prev => {
+          if (prev === null) return null;
+          const next = Math.round((prev - 0.5) * 10) / 10;
+          if (next <= 0) { triggerBowRef.current?.(); return intervalSec; }
+          return next;
+        });
+      }, 500);
+    } else clearInterval(bowTimerRef.current);
+    return () => clearInterval(bowTimerRef.current);
+  }, [phase, autoMode, intervalSec]);
+
+  const getAudioCtx = () => {
+    if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtxRef.current.state === "suspended") audioCtxRef.current.resume();
+    return audioCtxRef.current;
+  };
+
+  const NOTE_FREQ = {C4:261.6,D4:293.7,E4:329.6,F4:349.2,G4:392.0,A4:440.0,B4:493.9,C5:523.3,D5:587.3,E5:659.3,F5:698.5,G5:784.0,A5:880.0,G3:196.0,A3:220.0,B3:246.9,Fs4:370.0,Cs5:554.4,Fs5:740.0};
+  const MELODY = [["E5",3],["D5",3],["C5",3],["B4",3],["A4",3],["G4",3],["A4",3],["B4",3],["C5",3],["E5",3],["D5",3],["C5",3],["B4",6],["G4",3],["A4",3],["C5",3],["B4",3],["A4",3],["G4",3],["E4",3],["G4",3],["A4",3],["B4",3],["D5",3],["C5",3],["B4",3],["A4",9]];
+  const BASS = [["E4","G4"],["D4","F4"],["C4","E4"],["B3","D4"],["A3","C4"],["G3","B3"],["A3","C4"],["B3","D4"],["C4","E4"],["E4","G4"],["D4","F4"],["C4","E4"],["B3","D4"],["G3","B3"],["A3","C4"],["C4","E4"],["B3","D4"],["A3","C4"],["G3","B3"],["E3","G3"],["G3","B3"],["A3","C4"],["B3","D4"],["D4","Fs4"],["C4","E4"],["B3","D4"],["A3","C4"]];
+  const BGM_BPM = 52, BGM_BEAT = 60/BGM_BPM;
+
+  const playPianoNote = useCallback((freq, startTime, duration=2.5, vol=0.12) => {
+    try {
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator(), osc2 = ctx.createOscillator(), gain = ctx.createGain();
+      const dest = bgmRef.current?.gainNode || ctx.destination;
+      osc.connect(gain); osc2.connect(gain); gain.connect(dest);
+      osc.type = "triangle"; osc2.type = "sine";
+      osc.frequency.setValueAtTime(freq, startTime);
+      osc2.frequency.setValueAtTime(freq * 2.01, startTime);
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(vol, startTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(vol * 0.4, startTime + 0.3);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+      osc.start(startTime); osc.stop(startTime + duration);
+      osc2.start(startTime); osc2.stop(startTime + duration);
+    } catch {}
+  }, []);
+
+  const scheduleBGM = useCallback(() => {
+    if (!bgmRef.current || bgmRef.current.stopped) return;
+    const ctx = getAudioCtx();
+    let t = ctx.currentTime + 0.05, melodyBar = 0;
+    const scheduleChunk = () => {
+      if (!bgmRef.current || bgmRef.current.stopped) return;
+      const endTime = ctx.currentTime + 4;
+      while (t < endTime) {
+        const mi = melodyBar % MELODY.length;
+        const [note, beats] = MELODY[mi];
+        const dur = beats * BGM_BEAT;
+        const freq = NOTE_FREQ[note] || 440;
+        playPianoNote(freq, t, dur * 0.92, bgmVolRef.current * 0.8);
+        if (beats >= 3) {
+          const bi = mi % BASS.length;
+          BASS[bi].forEach((bn, i) => { const bf = NOTE_FREQ[bn]; if(bf) playPianoNote(bf, t+i*0.01, BGM_BEAT*3*0.85, bgmVolRef.current*0.45); });
+        }
+        t += dur; melodyBar++;
+      }
+      bgmRef.current.scheduleId = setTimeout(scheduleChunk, 2000);
+    };
+    scheduleChunk();
+  }, [playPianoNote]);
+
+  const startBGM = useCallback(() => {
+    const ctx = getAudioCtx();
+    const gainNode = ctx.createGain();
+    gainNode.gain.setValueAtTime(0, ctx.currentTime);
+    gainNode.gain.linearRampToValueAtTime(1, ctx.currentTime + 2);
+    gainNode.connect(ctx.destination);
+    bgmRef.current = { gainNode, scheduleId: null, stopped: false };
+    scheduleBGM();
+  }, [scheduleBGM]);
+
+  const stopBGM = useCallback(() => {
+    if (!bgmRef.current) return;
+    bgmRef.current.stopped = true;
+    clearTimeout(bgmRef.current.scheduleId);
+    try { const ctx = audioCtxRef.current; if(ctx&&bgmRef.current.gainNode) bgmRef.current.gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime+1.5); } catch {}
+    bgmRef.current = null;
+  }, []);
+
+  useEffect(() => { bgmVolRef.current = bgmVol; }, [bgmVol]);
+  useEffect(() => { if(bgmOn) startBGM(); else stopBGM(); return ()=>stopBGM(); }, [bgmOn]);
+
+  const playBowl = useCallback((isMilestone=false) => {
+    try {
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(isMilestone?528:432, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(isMilestone?440:360, ctx.currentTime+(isMilestone?2.5:1.2));
+      gain.gain.setValueAtTime(isMilestone?0.35:0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+(isMilestone?2.5:1.2));
+      osc.start(ctx.currentTime); osc.stop(ctx.currentTime+(isMilestone?2.5:1.2));
+    } catch {}
+  }, []);
+
+  const playBeep = useCallback(() => {
+    try {
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sine"; osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.06, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.15);
+      osc.start(ctx.currentTime); osc.stop(ctx.currentTime+0.15);
+    } catch {}
+  }, []);
+
+  const vibrate = useCallback((p) => { if(navigator.vibrate) navigator.vibrate(p); }, []);
+
+  const triggerBow = useCallback(() => {
+    setCount(prev => {
+      if (prev >= TOTAL) return prev;
+      const next = prev + 1;
+      const isMilestone = next % 36 === 0;
+      setRipple(true); setTimeout(()=>setRipple(false), 600);
+      if (isMilestone) { setMilestone(true); setTimeout(()=>setMilestone(false),1800); playBowl(true); vibrate([80,40,80,40,120]); }
+      else { playBowl(false); vibrate([30]); }
+      if (next === TOTAL) {
+        setPhase("done"); clearInterval(bowTimerRef.current);
+        setHistory(prev => { const key=todayKey(); const updated={...prev,[key]:(prev[key]||0)+1}; saveHistory(updated); return updated; });
+      }
+      return next;
+    });
+  }, [playBowl, vibrate]);
+
+  useEffect(() => { triggerBowRef.current = triggerBow; }, [triggerBow]);
+  useEffect(() => { if(autoMode&&bowCountdown!==null&&bowCountdown<=3&&bowCountdown>0&&phase==="active") playBeep(); }, [bowCountdown,autoMode,phase,playBeep]);
+
+  // 준비 카운트다운 (ready → active)
+  useEffect(() => {
+    if (phase === "ready") {
+      setReadyCount(5);
+      let cnt = 5;
+      readyTimerRef.current = setInterval(() => {
+        cnt -= 1;
+        setReadyCount(cnt);
+        playBeep();
+        if (cnt <= 0) {
+          clearInterval(readyTimerRef.current);
+          setPhase("active");
+          if (autoMode) setBowCountdown(intervalSec);
+        }
+      }, 1000);
+    } else {
+      clearInterval(readyTimerRef.current);
+    }
+    return () => clearInterval(readyTimerRef.current);
+  }, [phase]);
+
+  const handleBow = useCallback(() => {
+    if (phase === "done" || phase === "ready") return;
+    if (phase === "idle") { setPhase("ready"); return; }
+    if (!autoMode) triggerBow();
+  }, [phase, autoMode, intervalSec, triggerBow]);
+
+  const handleReset = () => {
+    clearInterval(timerRef.current); clearInterval(bowTimerRef.current); clearInterval(readyTimerRef.current);
+    setCount(0); setPhase("idle"); setElapsed(0);
+    setReadyCount(5); setMilestone(false); setRipple(false); setBowCountdown(null);
+  };
+
+  const progress = count / TOTAL;
+  const remaining = TOTAL - count;
+  const circumference = 2 * Math.PI * 110;
+  const dashOffset = circumference * (1 - progress);
+  const milestoneLabel = count===36?"삼분의 일":count===72?"삼분의 이":count===108?"원만성취":null;
+  const cdCircumference = 2 * Math.PI * 110;
+  const cdDashOffset = cdCircumference * (1 - (bowCountdown !== null ? bowCountdown/intervalSec : 0));
+
+  return (
+    <div style={{minHeight:"100vh",background:"#1A1A18",display:"flex",flexDirection:"column",alignItems:"center",fontFamily:"'Georgia','Batang',serif",userSelect:"none",WebkitUserSelect:"none",position:"relative",overflow:"hidden"}}>
+      <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:500,height:500,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,110,80,0.06) 0%,transparent 70%)",pointerEvents:"none",zIndex:0}}/>
+
+      {/* 탭 헤더 */}
+      <div style={{width:"100%",maxWidth:400,display:"flex",borderBottom:"1px solid rgba(242,237,228,0.06)",zIndex:10,position:"sticky",top:0,background:"#1A1A18"}}>
+        {[{id:"counter",label:"百八拜"},{id:"calendar",label:"기록"}].map(({id,label})=>(
+          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"18px 0",background:"none",border:"none",color:tab===id?"#F2EDE4":"#6B6B60",fontSize:tab===id?12:11,letterSpacing:"0.3em",fontFamily:"'Helvetica Neue',sans-serif",fontWeight:tab===id?400:300,cursor:"pointer",borderBottom:tab===id?"1px solid rgba(201,75,58,0.6)":"1px solid transparent",marginBottom:-1,transition:"all 0.3s ease"}}>{label}</button>
+        ))}
+      </div>
+
+      {/* 카운터 탭 */}
+      {tab === "counter" && (
+        <div style={{flex:1,width:"100%",maxWidth:400,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"space-between",padding:"32px 24px 36px",zIndex:1}}>
+
+          {/* 상단 */}
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12,width:"100%"}}>
+            <div style={{fontSize:13,color:"#6B6B60",letterSpacing:"0.15em",fontFamily:"'Helvetica Neue',sans-serif",fontWeight:300}}>
+              {sessions>0?`오늘 ${sessions}회 완료`:"오늘의 첫 번째 절"}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <button onClick={()=>setBgmOn(v=>!v)} style={{display:"flex",alignItems:"center",gap:6,background:bgmOn?"rgba(143,168,154,0.12)":"none",border:`1px solid ${bgmOn?"rgba(143,168,154,0.35)":"rgba(242,237,228,0.1)"}`,borderRadius:20,padding:"5px 12px",cursor:"pointer",transition:"all 0.3s ease"}}>
+                <span style={{fontSize:13}}>{bgmOn?"♪":"♩"}</span>
+                <span style={{fontSize:10,letterSpacing:"0.2em",color:bgmOn?"#8FA89A":"#6B6B60",fontFamily:"'Helvetica Neue',sans-serif",fontWeight:300}}>{bgmOn?"음악 ON":"음악 OFF"}</span>
+              </button>
+              {bgmOn&&(
+                <div style={{display:"flex",alignItems:"center",gap:6,animation:"fadeIn 0.3s ease"}}>
+                  <span style={{fontSize:10,color:"#6B6B60"}}>🔈</span>
+                  <input type="range" min={0.02} max={0.4} step={0.01} value={bgmVol} onChange={e=>setBgmVol(parseFloat(e.target.value))} style={{width:72,cursor:"pointer"}}/>
+                  <span style={{fontSize:10,color:"#6B6B60"}}>🔊</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 중앙 */}
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:28}}>
+            <div onClick={handleBow} style={{cursor:phase==="done"?"default":"pointer",position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              {ripple&&<div style={{position:"absolute",width:260,height:260,borderRadius:"50%",border:"1.5px solid rgba(201,75,58,0.5)",animation:"rippleOut 0.6s ease-out forwards",pointerEvents:"none"}}/>}
+              <svg width={280} height={280} viewBox="0 0 280 280">
+                <circle cx={140} cy={140} r={110} fill="none" stroke="rgba(242,237,228,0.06)" strokeWidth={1.5}/>
+                {autoMode&&phase==="active"&&bowCountdown!==null&&(
+                  <circle cx={140} cy={140} r={110} fill="none" stroke="rgba(143,168,154,0.25)" strokeWidth={6} strokeDasharray={cdCircumference} strokeDashoffset={cdDashOffset} strokeLinecap="round" transform="rotate(-90 140 140)" style={{transition:"stroke-dashoffset 0.45s linear"}}/>
+                )}
+                {[36,72].map(m=>{const a=(m/TOTAL)*2*Math.PI-Math.PI/2;return<line key={m} x1={140+103*Math.cos(a)} y1={140+103*Math.sin(a)} x2={140+117*Math.cos(a)} y2={140+117*Math.sin(a)} stroke="rgba(242,237,228,0.18)" strokeWidth={1}/>;} )}
+                <circle cx={140} cy={140} r={110} fill="none" stroke={phase==="done"?"#8FA89A":"#C94B3A"} strokeWidth={1.5} strokeDasharray={circumference} strokeDashoffset={dashOffset} strokeLinecap="round" transform="rotate(-90 140 140)" style={{transition:"stroke-dashoffset 0.4s ease,stroke 0.8s ease"}}/>
+              </svg>
+              <div style={{position:"absolute",textAlign:"center"}}>
+                {phase==="done"?(
+                  <div>
+                    <div style={{fontSize:15,color:"#8FA89A",letterSpacing:"0.2em",fontFamily:"'Helvetica Neue',sans-serif",fontWeight:300,animation:"fadeIn 1s ease"}}>원만성취</div>
+                    <div style={{fontSize:52,color:"#F2EDE4",lineHeight:1,fontWeight:400,marginTop:6}}>108</div>
+                  </div>
+                ):phase==="ready"?(
+                  <div style={{animation:"fadeIn 0.3s ease"}}>
+                    <div style={{fontSize:72,color:"#C94B3A",lineHeight:1,fontWeight:200,fontFamily:"'Helvetica Neue',sans-serif",animation:"fadeIn 0.25s ease",key:readyCount}}>{readyCount}</div>
+                    <div style={{fontSize:11,color:"#6B6B60",letterSpacing:"0.3em",fontFamily:"'Helvetica Neue',sans-serif",fontWeight:300,marginTop:8}}>준비</div>
+                  </div>
+                ):(
+                  <div>
+                    <div style={{fontSize:64,color:"#F2EDE4",lineHeight:1,fontWeight:400,transition:"transform 0.15s ease",transform:ripple?"scale(0.95)":"scale(1)"}}>{count}</div>
+                    {autoMode&&phase==="active"&&bowCountdown!==null?(
+                      <div style={{fontSize:13,color:bowCountdown<=3?"#C94B3A":"#6B6B60",letterSpacing:"0.2em",fontFamily:"'Helvetica Neue',sans-serif",fontWeight:300,marginTop:4,transition:"color 0.3s ease"}}>{bowCountdown}초 후</div>
+                    ):(
+                      <div style={{fontSize:12,color:"#6B6B60",letterSpacing:"0.25em",fontFamily:"'Helvetica Neue',sans-serif",fontWeight:300,marginTop:4}}>{phase==="idle"?"터치하여 시작":`남은 절  ${remaining}`}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{height:24,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              {milestone&&milestoneLabel&&<div style={{fontSize:13,color:"#C94B3A",letterSpacing:"0.3em",animation:"fadeIn 0.4s ease"}}>— {milestoneLabel} —</div>}
+            </div>
+
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:28,color:phase==="active"||phase==="done"?"rgba(242,237,228,0.7)":"rgba(107,107,96,0.4)",fontFamily:"'Helvetica Neue',monospace",fontWeight:200,letterSpacing:"0.12em",transition:"color 0.5s ease"}}>{formatTime(elapsed)}</div>
+              <div style={{fontSize:10,color:"#6B6B60",letterSpacing:"0.3em",fontFamily:"'Helvetica Neue',sans-serif",fontWeight:300,marginTop:4}}>소요 시간</div>
+            </div>
+
+            {phase==="idle"&&(
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,padding:"18px 24px",border:"1px solid rgba(242,237,228,0.08)",borderRadius:4,background:"rgba(242,237,228,0.03)",width:240,animation:"fadeIn 0.4s ease"}}>
+                <div style={{display:"flex",gap:0,border:"1px solid rgba(242,237,228,0.12)",borderRadius:3,overflow:"hidden",width:"100%"}}>
+                  {[{v:false,label:"수동"},{v:true,label:"자동 간격"}].map(({v,label})=>(
+                    <button key={label} onClick={()=>setAutoMode(v)} style={{flex:1,padding:"7px 0",background:autoMode===v?"rgba(201,75,58,0.15)":"none",border:"none",color:autoMode===v?"#C94B3A":"#6B6B60",fontSize:11,letterSpacing:"0.2em",fontFamily:"'Helvetica Neue',sans-serif",fontWeight:300,cursor:"pointer",transition:"all 0.25s ease"}}>{label}</button>
+                  ))}
+                </div>
+                {autoMode&&(
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,width:"100%"}}>
+                    <div style={{fontSize:10,color:"#6B6B60",letterSpacing:"0.3em",fontFamily:"'Helvetica Neue',sans-serif"}}>1배 간격</div>
+                    <div style={{display:"flex",alignItems:"center",gap:16}}>
+                      <button onClick={()=>setIntervalSec(s=>Math.max(0.5,Math.round((s-0.5)*10)/10))} style={{width:32,height:32,borderRadius:"50%",border:"1px solid rgba(242,237,228,0.15)",background:"none",color:"rgba(242,237,228,0.5)",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                      <div style={{textAlign:"center",minWidth:60}}>
+                        <span style={{fontSize:32,color:"#F2EDE4",fontFamily:"'Helvetica Neue',monospace",fontWeight:200}}>{intervalSec}</span>
+                        <span style={{fontSize:11,color:"#6B6B60",fontFamily:"'Helvetica Neue',sans-serif",marginLeft:4}}>초</span>
+                      </div>
+                      <button onClick={()=>setIntervalSec(s=>Math.min(120,Math.round((s+0.5)*10)/10))} style={{width:32,height:32,borderRadius:"50%",border:"1px solid rgba(242,237,228,0.15)",background:"none",color:"rgba(242,237,228,0.5)",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                    </div>
+                    <div style={{display:"flex",gap:6}}>
+                      {[3,5,10,15,30].map(v=>(
+                        <button key={v} onClick={()=>setIntervalSec(v)} style={{padding:"4px 8px",background:intervalSec===v?"rgba(201,75,58,0.18)":"none",border:`1px solid ${intervalSec===v?"rgba(201,75,58,0.4)":"rgba(242,237,228,0.1)"}`,color:intervalSec===v?"#C94B3A":"#6B6B60",fontSize:10,letterSpacing:"0.1em",fontFamily:"'Helvetica Neue',sans-serif",borderRadius:2,cursor:"pointer",transition:"all 0.2s ease"}}>{v}s</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 하단 */}
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16,width:"100%",maxWidth:260}}>
+            {phase!=="idle"&&(
+              <button onClick={handleReset} style={{background:"none",border:"1px solid rgba(242,237,228,0.12)",color:"rgba(242,237,228,0.35)",fontSize:11,letterSpacing:"0.3em",padding:"10px 24px",cursor:"pointer",fontFamily:"'Helvetica Neue',sans-serif",fontWeight:300,borderRadius:2,width:"100%",transition:"border-color 0.3s,color 0.3s"}}>처음으로</button>
+            )}
+            <div style={{display:"flex",justifyContent:"space-between",width:"100%",fontSize:10,color:"#6B6B60",fontFamily:"'Helvetica Neue',sans-serif",letterSpacing:"0.15em",fontWeight:300}}>
+              <span>0</span><span>36</span><span>72</span><span>108</span>
+            </div>
+            <div style={{width:"100%",height:1,background:"rgba(242,237,228,0.08)",position:"relative"}}>
+              <div style={{position:"absolute",top:0,left:0,height:"100%",width:`${progress*100}%`,background:phase==="done"?"#8FA89A":"#C94B3A",transition:"width 0.4s ease,background 0.8s ease"}}/>
+              {[36,72].map(m=><div key={m} style={{position:"absolute",top:-3,left:`${(m/TOTAL)*100}%`,width:1,height:7,background:"rgba(242,237,228,0.2)",transform:"translateX(-50%)"}}/>)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 달력 탭 */}
+      {tab==="calendar"&&(
+        <div style={{flex:1,width:"100%",maxWidth:400,padding:"28px 20px 40px",zIndex:1,animation:"fadeIn 0.3s ease"}}>
+          <Calendar history={history}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+  </script>
+
+  <!-- Service Worker 등록 (PWA) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
