@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<title>百八拜</title>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="百八拜"/>
+<meta name="theme-color" content="#1A1A18"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon.png"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#1A1A18;overflow:hidden}
+body{font-family:Georgia,'Batang',serif;color:#F2EDE4;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#app{position:fixed;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;max-width:400px;margin:0 auto}
+#tabs{width:100%;display:flex;border-bottom:1px solid rgba(242,237,228,0.06);background:#1A1A18;flex-shrink:0}
+.tab-btn{flex:1;padding:18px 0;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;color:#6B6B60;font-size:11px;letter-spacing:.3em;font-family:'Helvetica Neue',sans-serif;font-weight:300;cursor:pointer}
+.tab-btn.on{color:#F2EDE4;border-bottom-color:rgba(201,75,58,0.6)}
+#counter,#calendar{flex:1;width:100%;overflow-y:auto}
+#counter{display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:24px 20px 28px}
+#calendar{padding:24px 20px 40px;display:none}
+#session-text{font-size:13px;color:#6B6B60;letter-spacing:.15em;font-family:'Helvetica Neue',sans-serif;text-align:center}
+#bgm-row{display:flex;align-items:center;gap:12px;margin-top:10px}
+#bgm-btn{display:flex;align-items:center;gap:6px;background:none;border:1px solid rgba(242,237,228,0.12);border-radius:20px;padding:5px 14px;cursor:pointer;color:#6B6B60;font-size:10px;letter-spacing:.2em;font-family:'Helvetica Neue',sans-serif}
+#bgm-btn.on{background:rgba(143,168,154,0.12);border-color:rgba(143,168,154,0.35);color:#8FA89A}
+#vol-row{display:flex;align-items:center;gap:6px;opacity:0;pointer-events:none;transition:opacity .3s}
+#vol-row.show{opacity:1;pointer-events:auto}
+#vol-slider{width:72px;accent-color:#8FA89A}
+#ring-wrap{position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}
+#ring-wrap.done{cursor:default}
+#center{position:absolute;text-align:center;pointer-events:none}
+#n{font-size:64px;line-height:1;font-weight:400;color:#F2EDE4;transition:transform .15s}
+#n.p{transform:scale(.94)}
+#sub{font-size:12px;color:#6B6B60;letter-spacing:.25em;font-family:'Helvetica Neue',sans-serif;margin-top:4px}
+#ready-n{font-size:72px;line-height:1;font-weight:200;color:#C94B3A;font-family:'Helvetica Neue',sans-serif}
+#ready-s{font-size:11px;color:#6B6B60;letter-spacing:.3em;font-family:'Helvetica Neue',sans-serif;margin-top:8px}
+#done-l{font-size:15px;color:#8FA89A;letter-spacing:.2em;font-family:'Helvetica Neue',sans-serif;font-weight:300}
+#done-n{font-size:52px;line-height:1;font-weight:400;color:#F2EDE4;margin-top:6px}
+.rview{display:none}
+@keyframes ripOut{from{transform:scale(1);opacity:1}to{transform:scale(1.45);opacity:0}}
+.rip{position:absolute;width:260px;height:260px;border-radius:50%;border:1.5px solid rgba(201,75,58,0.5);animation:ripOut .6s ease-out forwards;pointer-events:none}
+#mm{height:22px;font-size:13px;color:#C94B3A;letter-spacing:.3em;text-align:center;opacity:0;transition:opacity .3s}
+#mm.show{opacity:1}
+#timer{font-size:28px;color:rgba(107,107,96,0.4);font-family:'Helvetica Neue',monospace;font-weight:200;letter-spacing:.12em;text-align:center;transition:color .5s}
+#timer.on{color:rgba(242,237,228,0.7)}
+#tlbl{font-size:10px;color:#6B6B60;letter-spacing:.3em;font-family:'Helvetica Neue',sans-serif;text-align:center;margin-top:3px}
+#sbox{display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px 22px;border:1px solid rgba(242,237,228,0.08);border-radius:4px;background:rgba(242,237,228,0.03);width:240px}
+#mtog{display:flex;border:1px solid rgba(242,237,228,0.12);border-radius:3px;overflow:hidden;width:100%}
+.mb{flex:1;padding:7px 0;background:none;border:none;color:#6B6B60;font-size:11px;letter-spacing:.2em;font-family:'Helvetica Neue',sans-serif;cursor:pointer}
+.mb.on{background:rgba(201,75,58,0.15);color:#C94B3A}
+#iwrap{display:none;flex-direction:column;align-items:center;gap:10px;width:100%}
+#ilbl{font-size:10px;color:#6B6B60;letter-spacing:.3em;font-family:'Helvetica Neue',sans-serif}
+#ictrl{display:flex;align-items:center;gap:16px}
+.ib{width:32px;height:32px;border-radius:50%;border:1px solid rgba(242,237,228,0.15);background:none;color:rgba(242,237,228,0.5);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+#inum{font-size:32px;color:#F2EDE4;font-family:'Helvetica Neue',monospace;font-weight:200}
+#iunit{font-size:11px;color:#6B6B60;font-family:'Helvetica Neue',sans-serif;margin-left:3px}
+#presets{display:flex;gap:6px}
+.pb{padding:4px 8px;background:none;border:1px solid rgba(242,237,228,0.1);color:#6B6B60;font-size:10px;font-family:'Helvetica Neue',sans-serif;border-radius:2px;cursor:pointer}
+.pb.on{background:rgba(201,75,58,0.18);border-color:rgba(201,75,58,0.4);color:#C94B3A}
+#bottom{display:flex;flex-direction:column;align-items:center;gap:14px;width:100%;max-width:260px}
+#rbtn{background:none;border:1px solid rgba(242,237,228,0.12);color:rgba(242,237,228,0.35);font-size:11px;letter-spacing:.3em;padding:10px;cursor:pointer;font-family:'Helvetica Neue',sans-serif;border-radius:2px;width:100%;display:none}
+#plbls{display:flex;justify-content:space-between;width:100%;font-size:10px;color:#6B6B60;font-family:'Helvetica Neue',sans-serif;letter-spacing:.15em}
+#ptrack{width:100%;height:1px;background:rgba(242,237,228,0.08);position:relative}
+#pfill{position:absolute;top:0;left:0;height:100%;width:0;background:#C94B3A;transition:width .4s,background .8s}
+.pm{position:absolute;top:-3px;width:1px;height:7px;background:rgba(242,237,228,0.2);transform:translateX(-50%)}
+/* 달력 */
+#cstats{display:flex;justify-content:space-between;margin-bottom:20px}
+.sv{font-size:20px;color:#F2EDE4;font-family:'Helvetica Neue',sans-serif;font-weight:200;text-align:center}
+.sl{font-size:10px;color:#6B6B60;letter-spacing:.2em;font-family:'Helvetica Neue',sans-serif;text-align:center;margin-top:2px}
+#cnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.cnb{background:none;border:none;color:rgba(242,237,228,0.4);font-size:24px;cursor:pointer;padding:4px 10px}
+#cml{font-size:14px;color:#F2EDE4;letter-spacing:.2em;font-family:'Helvetica Neue',sans-serif;font-weight:300}
+#cdh,#cgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+#cdh{margin-bottom:4px}
+.dname{text-align:center;font-size:10px;font-family:'Helvetica Neue',sans-serif;padding-bottom:5px}
+.dc{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:42px;border-radius:4px;border:1px solid transparent;cursor:pointer;gap:3px;padding:4px 1px}
+.dc.today{border-color:rgba(201,75,58,0.4)}
+.dc.done{background:rgba(143,168,154,0.08)}
+.dc.sel{background:rgba(201,75,58,0.15);border-color:rgba(201,75,58,0.3)}
+.dc.fut{cursor:default}
+.dn{font-size:12px;font-family:'Helvetica Neue',sans-serif;font-weight:300;color:rgba(242,237,228,0.4)}
+.dc.done .dn,.dc.today .dn{color:#F2EDE4}
+.dc.today .dn{color:#C94B3A}
+.dc.fut .dn{color:rgba(107,107,96,0.2)}
+.dots{display:flex;gap:2px}
+.dot{width:4px;height:4px;border-radius:50%}
+#cdet{margin-top:14px;padding:14px 16px;border:1px solid rgba(242,237,228,0.08);border-radius:4px;background:rgba(242,237,228,0.03);display:none;justify-content:space-between;align-items:center}
+#cdlbl{font-size:13px;color:#6B6B60;font-family:'Helvetica Neue',sans-serif}
+#cdval{font-size:22px;color:#8FA89A;font-family:'Helvetica Neue',sans-serif;font-weight:200}
+#cdunit{font-size:11px;color:#6B6B60;font-family:'Helvetica Neue',sans-serif;margin-left:3px}
+#cdempty{font-size:12px;color:rgba(107,107,96,0.5);font-family:'Helvetica Neue',sans-serif}
+#glow{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(139,110,80,0.06) 0%,transparent 70%);pointer-events:none;z-index:-1}
+</style>
+</head>
+<body>
+<div id="glow"></div>
+<div id="app">
+  <div id="tabs">
+    <button class="tab-btn on" onclick="showTab('counter')">百八拜</button>
+    <button class="tab-btn" onclick="showTab('calendar')">기록</button>
+  </div>
+  <div id="counter">
+    <div style="display:flex;flex-direction:column;align-items:center;width:100%">
+      <div id="session-text">오늘의 첫 번째 절</div>
+      <div id="bgm-row">
+        <button id="bgm-btn" onclick="togBGM()"><span id="bnote">♩</span> <span id="blbl">음악 OFF</span></button>
+        <div id="vol-row"><span style="font-size:10px;color:#6B6B60">🔈</span><input id="vol-slider" type="range" min="0.02" max="0.4" step="0.01" value="0.18" oninput="setVol(this.value)"/><span style="font-size:10px;color:#6B6B60">🔊</span></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:24px">
+      <div id="ring-wrap" onclick="handleBow()">
+        <svg width="280" height="280" viewBox="0 0 280 280" style="display:block">
+          <circle cx="140" cy="140" r="110" fill="none" stroke="rgba(242,237,228,0.06)" stroke-width="1.5"/>
+          <circle id="cdarc" cx="140" cy="140" r="110" fill="none" stroke="rgba(143,168,154,0.25)" stroke-width="6" stroke-linecap="round" transform="rotate(-90 140 140)" style="display:none;transition:stroke-dashoffset .45s linear"/>
+          <line id="m36" stroke="rgba(242,237,228,0.18)" stroke-width="1"/>
+          <line id="m72" stroke="rgba(242,237,228,0.18)" stroke-width="1"/>
+          <circle id="parc" cx="140" cy="140" r="110" fill="none" stroke="#C94B3A" stroke-width="1.5" stroke-linecap="round" transform="rotate(-90 140 140)" style="transition:stroke-dashoffset .4s ease,stroke .8s ease"/>
+        </svg>
+        <div id="center">
+          <div id="nv"><div id="n">0</div><div id="sub">터치하여 시작</div></div>
+          <div id="rv" class="rview"><div id="ready-n">5</div><div id="ready-s">준비</div></div>
+          <div id="dv" class="rview"><div id="done-l">원만성취</div><div id="done-n">108</div></div>
+        </div>
+      </div>
+      <div id="mm"></div>
+      <div><div id="timer">00:00</div><div id="tlbl">소요 시간</div></div>
+      <div id="sbox">
+        <div id="mtog"><button class="mb on" onclick="setAuto(false)">수동</button><button class="mb" onclick="setAuto(true)">자동 간격</button></div>
+        <div id="iwrap">
+          <div id="ilbl">1배 간격</div>
+          <div id="ictrl">
+            <button class="ib" onclick="chgInt(-0.5)">−</button>
+            <div><span id="inum">5</span><span id="iunit">초</span></div>
+            <button class="ib" onclick="chgInt(0.5)">+</button>
+          </div>
+          <div id="presets">
+            <button class="pb" onclick="setPre(3)">3s</button>
+            <button class="pb on" onclick="setPre(5)">5s</button>
+            <button class="pb" onclick="setPre(10)">10s</button>
+            <button class="pb" onclick="setPre(15)">15s</button>
+            <button class="pb" onclick="setPre(30)">30s</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="bottom">
+      <button id="rbtn" onclick="doReset()">처음으로</button>
+      <div id="plbls"><span>0</span><span>36</span><span>72</span><span>108</span></div>
+      <div id="ptrack"><div id="pfill"></div><div class="pm" style="left:33.33%"></div><div class="pm" style="left:66.66%"></div></div>
+    </div>
+  </div>
+  <div id="calendar">
+    <div id="cstats">
+      <div><div class="sv" id="sm">0일</div><div class="sl">이번 달</div></div>
+      <div><div class="sv" id="ss">0일</div><div class="sl">연속</div></div>
+      <div><div class="sv" id="st">0회</div><div class="sl">누적</div></div>
+    </div>
+    <div id="cnav">
+      <button class="cnb" onclick="calMov(-1)">‹</button>
+      <div id="cml"></div>
+      <button class="cnb" id="cnxt" onclick="calMov(1)">›</button>
+    </div>
+    <div id="cdh"></div>
+    <div id="cgrid"></div>
+    <div id="cdet"><div id="cdlbl"></div><div><span id="cdval"></span><span id="cdunit"></span><span id="cdempty"></span></div></div>
+  </div>
+</div>
+<script>
+const TOTAL=108,C=2*Math.PI*110;
+let ctx=null,bgmOn=false,bgmVol=0.18,bgmGain=null,bgmStop=true,bgmTmr=null,bgmT=0,bgmIdx=0;
+let cnt=0,phase='idle',elapsed=0,intSec=5,autoM=false,bcd=null;
+let tiv=null,tst=null,biv=null,riv=null,rCnt=5,calY=new Date().getFullYear(),calM=new Date().getMonth(),calSel=null;
+let hist={}; try{const r=localStorage.getItem('bae108_v2');if(r)hist=JSON.parse(r);}catch{}
+function saveH(){try{localStorage.setItem('bae108_v2',JSON.stringify(hist));}catch{}}
+function toKey(d){const x=d instanceof Date?d:new Date(d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;}
+const today=()=>toKey(new Date());
+
+// SVG init
+function initSVG(){
+  const pa=document.getElementById('parc');
+  pa.setAttribute('stroke-dasharray',C);pa.setAttribute('stroke-dashoffset',C);
+  const ca=document.getElementById('cdarc');
+  ca.setAttribute('stroke-dasharray',C);ca.setAttribute('stroke-dashoffset',C);
+  function mk(id,m){const a=(m/TOTAL)*2*Math.PI-Math.PI/2,el=document.getElementById(id);
+    el.setAttribute('x1',140+103*Math.cos(a));el.setAttribute('y1',140+103*Math.sin(a));
+    el.setAttribute('x2',140+117*Math.cos(a));el.setAttribute('y2',140+117*Math.sin(a));}
+  mk('m36',36);mk('m72',72);
+}
+
+// Audio unlock — touchend에서 직접 ctx 생성 + resume
+let ctx=null;
+function getCtx(){
+  if(!ctx)ctx=new(window.AudioContext||window.webkitAudioContext)();
+  if(ctx.state==='suspended')ctx.resume();
+  return ctx;
+}
+function unlockAudio(){
+  const c=getCtx();
+  if(c.state==='running')return;
+  c.resume();
+}
+function tone(freq,dur,vol,target){
+  const c=getCtx(),o=c.createOscillator(),g=c.createGain();
+  o.connect(g);g.connect(target||c.destination);
+  o.type='sine';o.frequency.setValueAtTime(freq,c.currentTime);
+  o.frequency.exponentialRampToValueAtTime(freq*0.82,c.currentTime+dur);
+  g.gain.setValueAtTime(vol,c.currentTime);g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+dur);
+  o.start(c.currentTime);o.stop(c.currentTime+dur);
+}
+function bowl(ms){tone(ms?528:432,ms?2.5:1.2,ms?0.35:0.2);}
+function beep(){tone(880,0.15,0.07);}
+
+// BGM
+const NF={C4:261.6,D4:293.7,E4:329.6,F4:349.2,G4:392,A4:440,B4:493.9,C5:523.3,D5:587.3,E5:659.3,G3:196,A3:220,B3:246.9,Fs4:370,E3:164.8};
+const MEL=[['E5',3],['D5',3],['C5',3],['B4',3],['A4',3],['G4',3],['A4',3],['B4',3],['C5',3],['E5',3],['D5',3],['C5',3],['B4',6],['G4',3],['A4',3],['C5',3],['B4',3],['A4',3],['G4',3],['E4',3],['G4',3],['A4',3],['B4',3],['D5',3],['C5',3],['B4',3],['A4',9]];
+const BAS=[['E4','G4'],['D4','F4'],['C4','E4'],['B3','D4'],['A3','C4'],['G3','B3'],['A3','C4'],['B3','D4'],['C4','E4'],['E4','G4'],['D4','F4'],['C4','E4'],['B3','D4'],['G3','B3'],['A3','C4'],['C4','E4'],['B3','D4'],['A3','C4'],['G3','B3'],['E3','G3'],['G3','B3'],['A3','C4'],['B3','D4'],['D4','Fs4'],['C4','E4'],['B3','D4'],['A3','C4']];
+const BB=60/52;
+function pno(freq,st,dur,vol,dst){
+  const c=getCtx(),o1=c.createOscillator(),o2=c.createOscillator(),g=c.createGain();
+  o1.connect(g);o2.connect(g);g.connect(dst||c.destination);
+  o1.type='triangle';o2.type='sine';
+  o1.frequency.setValueAtTime(freq,st);o2.frequency.setValueAtTime(freq*2.01,st);
+  g.gain.setValueAtTime(0,st);g.gain.linearRampToValueAtTime(vol,st+0.01);
+  g.gain.exponentialRampToValueAtTime(vol*.4,st+.3);g.gain.exponentialRampToValueAtTime(0.0001,st+dur);
+  o1.start(st);o1.stop(st+dur);o2.start(st);o2.stop(st+dur);
+}
+function schBGM(){
+  if(bgmStop)return;
+  const c=getCtx(),end=c.currentTime+4;
+  while(bgmT<end){
+    const mi=bgmIdx%MEL.length,[note,beats]=MEL[mi],dur=beats*BB,freq=NF[note]||440;
+    pno(freq,bgmT,dur*.92,bgmVol*.6,bgmGain);
+    if(beats>=3){const bi=mi%BAS.length;BAS[bi].forEach((bn,i)=>{const bf=NF[bn];if(bf)pno(bf,bgmT+i*.01,BB*3*.85,bgmVol*.3,bgmGain);});}
+    bgmT+=dur;bgmIdx++;
+  }
+  bgmTmr=setTimeout(schBGM,2000);
+}
+function startBGM(){
+  bgmStop=false;const c=getCtx();
+  bgmGain=c.createGain();bgmGain.gain.setValueAtTime(0,c.currentTime);
+  bgmGain.gain.linearRampToValueAtTime(1,c.currentTime+2);bgmGain.connect(c.destination);
+  bgmT=c.currentTime+.1;bgmIdx=0;schBGM();
+}
+function stopBGM(){
+  bgmStop=true;clearTimeout(bgmTmr);
+  if(bgmGain){try{const c=getCtx();bgmGain.gain.linearRampToValueAtTime(0,c.currentTime+1.5);}catch{}}
+  bgmGain=null;
+}
+function togBGM(){
+  bgmOn=!bgmOn;
+  const b=document.getElementById('bgm-btn');
+  document.getElementById('bnote').textContent=bgmOn?'♪':'♩';
+  document.getElementById('blbl').textContent=bgmOn?'음악 ON':'음악 OFF';
+  b.classList.toggle('on',bgmOn);
+  document.getElementById('vol-row').classList.toggle('show',bgmOn);
+  bgmOn?startBGM():stopBGM();
+}
+function setVol(v){bgmVol=parseFloat(v);}
+
+// Timer
+function startTmr(){
+  tst=Date.now()-elapsed*1000;
+  tiv=setInterval(()=>{elapsed=Math.floor((Date.now()-tst)/1000);const m=String(Math.floor(elapsed/60)).padStart(2,'0'),s=String(elapsed%60).padStart(2,'0');document.getElementById('timer').textContent=`${m}:${s}`;},1000);
+  document.getElementById('timer').classList.add('on');
+}
+function stopTmr(){clearInterval(tiv);}
+
+// Bow
+function triggerBow(){
+  if(cnt>=TOTAL)return;cnt++;
+  const ms=cnt%36===0;
+  // ripple
+  const rw=document.getElementById('ring-wrap'),rp=document.createElement('div');
+  rp.className='rip';rw.appendChild(rp);setTimeout(()=>rp.remove(),700);
+  // pulse
+  const ne=document.getElementById('n');ne.classList.add('p');setTimeout(()=>ne.classList.remove('p'),150);
+  ne.textContent=cnt;
+  document.getElementById('sub').textContent=`남은 절  ${TOTAL-cnt}`;
+  document.getElementById('parc').setAttribute('stroke-dashoffset',C*(1-cnt/TOTAL));
+  document.getElementById('pfill').style.width=`${(cnt/TOTAL)*100}%`;
+  if(ms){
+    bowl(true);if(navigator.vibrate)navigator.vibrate([80,40,80,40,120]);
+    const lbs=['','삼분의 일','삼분의 이','원만성취'],mm=document.getElementById('mm');
+    mm.textContent=`— ${lbs[cnt/36]} —`;mm.classList.add('show');setTimeout(()=>mm.classList.remove('show'),1800);
+  } else {bowl(false);if(navigator.vibrate)navigator.vibrate([30]);}
+  if(cnt===TOTAL){
+    phase='done';clearInterval(biv);stopTmr();
+    document.getElementById('timer').classList.add('on');
+    document.getElementById('parc').setAttribute('stroke','#8FA89A');
+    document.getElementById('pfill').style.background='#8FA89A';
+    document.getElementById('cdarc').style.display='none';
+    show('dv');document.getElementById('ring-wrap').classList.add('done');
+    const k=today();hist[k]=(hist[k]||0)+1;saveH();updSess();
+  }
+}
+
+function show(id){
+  ['nv','rv','dv'].forEach(v=>document.getElementById(v).style.display=v===id?'block':'none');
+}
+
+function startReady(){
+  phase='ready';rCnt=5;
+  document.getElementById('sbox').style.display='none';
+  document.getElementById('rbtn').style.display='block';
+  show('rv');document.getElementById('ready-n').textContent=5;
+  riv=setInterval(()=>{rCnt--;beep();
+    if(rCnt<=0){clearInterval(riv);startActive();}
+    else document.getElementById('ready-n').textContent=rCnt;
+  },1000);
+}
+
+function startActive(){
+  phase='active';show('nv');
+  document.getElementById('n').textContent=cnt;
+  document.getElementById('sub').textContent=cnt===0?'남은 절  108':`남은 절  ${TOTAL-cnt}`;
+  startTmr();
+  if(autoM){
+    bcd=intSec;updCD();
+    biv=setInterval(()=>{
+      bcd=Math.round((bcd-.5)*10)/10;
+      if(bcd<=3&&bcd>0)beep();
+      document.getElementById('sub').textContent=`${bcd}초 후`;updCD();
+      if(bcd<=0){triggerBow();bcd=intSec;}
+    },500);
+  }
+}
+
+function updCD(){
+  const ca=document.getElementById('cdarc');
+  if(autoM&&phase==='active'){ca.style.display='block';ca.setAttribute('stroke-dashoffset',C*(1-(bcd/intSec)));}
+  else ca.style.display='none';
+}
+
+function handleBow(){
+  unlockAudio();
+  if(phase==='done'||phase==='ready')return;
+  if(phase==='idle'){startReady();return;}
+  if(!autoM)triggerBow();
+}
+
+function doReset(){
+  clearInterval(tiv);clearInterval(biv);clearInterval(riv);
+  cnt=0;phase='idle';elapsed=0;bcd=null;
+  document.getElementById('n').textContent='0';
+  document.getElementById('sub').textContent='터치하여 시작';
+  document.getElementById('timer').textContent='00:00';
+  document.getElementById('timer').classList.remove('on');
+  document.getElementById('parc').setAttribute('stroke-dashoffset',C);
+  document.getElementById('parc').setAttribute('stroke','#C94B3A');
+  document.getElementById('pfill').style.width='0';
+  document.getElementById('pfill').style.background='#C94B3A';
+  document.getElementById('cdarc').style.display='none';
+  document.getElementById('mm').classList.remove('show');
+  document.getElementById('rbtn').style.display='none';
+  document.getElementById('sbox').style.display='flex';
+  document.getElementById('ring-wrap').classList.remove('done');
+  show('nv');
+}
+
+function setAuto(v){
+  autoM=v;
+  document.querySelectorAll('.mb').forEach((b,i)=>b.classList.toggle('on',i===(v?1:0)));
+  document.getElementById('iwrap').style.display=v?'flex':'none';
+}
+function chgInt(d){intSec=Math.round(Math.max(.5,Math.min(120,intSec+d))*10)/10;document.getElementById('inum').textContent=intSec;updPre();}
+function setPre(v){intSec=v;document.getElementById('inum').textContent=v;updPre();}
+function updPre(){document.querySelectorAll('.pb').forEach(b=>b.classList.toggle('on',parseFloat(b.textContent)===intSec));}
+function updSess(){const s=hist[today()]||0;document.getElementById('session-text').textContent=s>0?`오늘 ${s}회 완료`:'오늘의 첫 번째 절';}
+
+function showTab(t){
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('on',['counter','calendar'][i]===t));
+  document.getElementById('counter').style.display=t==='counter'?'flex':'none';
+  document.getElementById('calendar').style.display=t==='calendar'?'block':'none';
+  if(t==='calendar')renderCal();
+}
+
+// Calendar
+function calMov(d){
+  calM+=d;if(calM<0){calM=11;calY--;}else if(calM>11){calM=0;calY++;}
+  calSel=null;renderCal();
+}
+function renderCal(){
+  const now=new Date(),todS=today();
+  const MN=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const DN=['일','월','화','수','목','금','토'];
+  const DC=['rgba(201,75,58,0.6)','#6B6B60','#6B6B60','#6B6B60','#6B6B60','#6B6B60','rgba(143,168,154,0.6)'];
+  document.getElementById('cml').textContent=`${calY}년 ${MN[calM]}`;
+  document.getElementById('cnxt').style.opacity=(calY===now.getFullYear()&&calM===now.getMonth())?.2:1;
+  const pfx=`${calY}-${String(calM+1).padStart(2,'0')}`;
+  const mDone=Object.entries(hist).filter(([k,v])=>k.startsWith(pfx)&&v>0).length;
+  let streak=0;const chk=new Date();
+  while(streak<366){const k=toKey(chk);if(hist[k]&&hist[k]>0){streak++;chk.setDate(chk.getDate()-1);}else break;}
+  const total=Object.values(hist).reduce((a,b)=>a+b,0);
+  document.getElementById('sm').textContent=`${mDone}일`;
+  document.getElementById('ss').textContent=`${streak}일`;
+  document.getElementById('st').textContent=`${total}회`;
+  document.getElementById('cdh').innerHTML=DN.map((d,i)=>`<div class="dname" style="color:${DC[i]}">${d}</div>`).join('');
+  const fd=new Date(calY,calM,1).getDay(),dim=new Date(calY,calM+1,0).getDate();
+  let h='';
+  for(let i=0;i<fd;i++)h+='<div></div>';
+  for(let d=1;d<=dim;d++){
+    const k=`${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const c=hist[k]||0,iT=k===todS,iF=new Date(calY,calM,d)>new Date(now.getFullYear(),now.getMonth(),now.getDate()),iS=d===calSel;
+    let cl='dc';if(iT)cl+=' today';if(c>0)cl+=' done';if(iS)cl+=' sel';if(iF)cl+=' fut';
+    const dots=c>0?`<div class="dots">${Array.from({length:Math.min(c,3)},(_,i)=>`<div class="dot" style="background:${i===0?'#8FA89A':i===1?'rgba(143,168,154,0.6)':'rgba(143,168,154,0.3)'}"></div>`).join('')}</div>`:'';
+    h+=`<div class="${cl}"${!iF?` onclick="selDay(${d})"`:''}><span class="dn">${d}</span>${dots}</div>`;
+  }
+  document.getElementById('cgrid').innerHTML=h;
+  renderDet();
+}
+function selDay(d){calSel=calSel===d?null:d;renderCal();}
+function renderDet(){
+  const det=document.getElementById('cdet');
+  if(!calSel){det.style.display='none';return;}
+  det.style.display='flex';
+  const k=`${calY}-${String(calM+1).padStart(2,'0')}-${String(calSel).padStart(2,'0')}`,c=hist[k]||0;
+  document.getElementById('cdlbl').textContent=`${calM+1}월 ${calSel}일`;
+  if(c>0){document.getElementById('cdval').textContent=c;document.getElementById('cdunit').textContent='회 완료';document.getElementById('cdempty').textContent='';}
+  else{document.getElementById('cdval').textContent='';document.getElementById('cdunit').textContent='';document.getElementById('cdempty').textContent='기록 없음';}
+}
+
+// Init
+initSVG();updSess();show('nv');
+// ring-wrap: onclick 유지 + touchstart에서 오디오 unlock만
+document.getElementById('ring-wrap').addEventListener('touchstart',function(e){
+  unlockAudio();
+},{passive:true});
+document.getElementById('ring-wrap').addEventListener('click',handleBow);
+</script>
+<script>
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister()));
+}
+</script>
+</body>
+</html>
